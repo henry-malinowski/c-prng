@@ -14,6 +14,8 @@
 
 // Xoshiro256++ state (4 × uint64_t = 256 bits)
 static uint64_t xoshiro_state[4] = {0, 0, 0, 0};
+static uint32_t xoshiro_buffer = 0;
+static int xoshiro_has_buffered = 0;
 
 /**
  * Rotate left operation
@@ -56,17 +58,15 @@ static uint64_t xoshiro_next_u64(void) {
  * Generate next 32-bit value from Xoshiro256++ state
  */
 static uint32_t xoshiro_next_u32(void) {
-    static uint64_t cached_u64 = 0;
-    static int use_high = 0;
-    
-    if (!use_high) {
-        cached_u64 = xoshiro_next_u64();
-        use_high = 1;
-        return (uint32_t)(cached_u64 & 0xFFFFFFFFULL);
-    } else {
-        use_high = 0;
-        return (uint32_t)(cached_u64 >> 32);
+    if (xoshiro_has_buffered) {
+        xoshiro_has_buffered = 0;
+        return xoshiro_buffer;
     }
+
+    uint64_t value = xoshiro_next_u64();
+    xoshiro_buffer = (uint32_t)(value >> 32);
+    xoshiro_has_buffered = 1;
+    return (uint32_t)(value & 0xFFFFFFFFULL);
 }
 
 uint32_t getInitSeedBytes(void) {
@@ -82,6 +82,7 @@ void init(const uint8_t* seed, size_t seed_len) {
         xoshiro_state[1] = splitmix64(&sm);
         xoshiro_state[2] = splitmix64(&sm);
         xoshiro_state[3] = splitmix64(&sm);
+        xoshiro_has_buffered = 0;
         return;
     }
     
@@ -96,6 +97,7 @@ void init(const uint8_t* seed, size_t seed_len) {
     xoshiro_state[1] = splitmix64(&sm);
     xoshiro_state[2] = splitmix64(&sm);
     xoshiro_state[3] = splitmix64(&sm);
+    xoshiro_has_buffered = 0;
 }
 
 uint32_t getBoundedInt(uint32_t min, uint32_t max) {
@@ -103,5 +105,17 @@ uint32_t getBoundedInt(uint32_t min, uint32_t max) {
 }
 
 double getUniformNumber(void) {
+    xoshiro_has_buffered = 0;
     return u64_to_float64(xoshiro_next_u64);
 }
+
+#ifdef PRNG_TEST
+uint32_t prng_test_next_u32(void) {
+    return xoshiro_next_u32();
+}
+
+uint64_t prng_test_next_u64(void) {
+    xoshiro_has_buffered = 0;
+    return xoshiro_next_u64();
+}
+#endif

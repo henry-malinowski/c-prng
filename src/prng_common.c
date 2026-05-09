@@ -153,13 +153,11 @@ double u64_to_float64(uint64_t (*next_u64)(void)) {
 
 /**
  * Get an unbiased bounded integer in range [min, max] (inclusive).
- * 
- * Uses rejection sampling to avoid modulo bias. This is the same method
- * used by Zig's std.Random.intRangeAtMost.
+ *
+ * Uses Lemire's nearly-divisionless rejection sampling to avoid modulo bias.
  */
 uint32_t getBoundedIntHelper(uint32_t min, uint32_t max, uint32_t (*next_u32)(void)) {
     if (min > max) {
-        // Swap if min > max (defensive)
         uint32_t temp = min;
         min = max;
         max = temp;
@@ -168,19 +166,29 @@ uint32_t getBoundedIntHelper(uint32_t min, uint32_t max, uint32_t (*next_u32)(vo
     if (min == max) {
         return min;
     }
-    
-    // Calculate range size
-    uint32_t range = max - min + 1;
-    
-    // For small ranges, use rejection sampling
-    // Calculate the threshold: (2^32 / range) * range
-    // This ensures we only accept values that map uniformly to [0, range)
-    uint32_t threshold = (UINT32_MAX / range) * range;
-    uint32_t r;
-    
-    do {
-        r = next_u32();
-    } while (r >= threshold);
-    
-    return min + (r % range);
+
+    const uint64_t span = (uint64_t)max - (uint64_t)min + 1ULL;
+
+    if (span == (1ULL << 32)) {
+        return next_u32();
+    }
+
+    const uint32_t range = (uint32_t)span;
+
+    if ((range & (range - 1U)) == 0U) {
+        return min + (next_u32() & (range - 1U));
+    }
+
+    uint64_t m = (uint64_t)next_u32() * (uint64_t)range;
+    uint32_t l = (uint32_t)m;
+
+    if (l < range) {
+        const uint32_t t = (uint32_t)(-range) % range;
+        while (l < t) {
+            m = (uint64_t)next_u32() * (uint64_t)range;
+            l = (uint32_t)m;
+        }
+    }
+
+    return min + (uint32_t)(m >> 32);
 }

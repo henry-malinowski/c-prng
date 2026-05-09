@@ -34,7 +34,7 @@ double u64_to_float64(uint64_t (*next_u64)(void));
 
 /**
  * Get an unbiased bounded integer in range [min, max] (inclusive).
- * Uses rejection sampling to avoid modulo bias.
+ * Uses Lemire's nearly-divisionless rejection sampling to avoid modulo bias.
  * @param min Minimum value (inclusive)
  * @param max Maximum value (inclusive)
  * @param next_u32 Function pointer to generate next uint32_t

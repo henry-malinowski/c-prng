@@ -96,3 +96,9 @@ uint32_t getBoundedInt(uint32_t min, uint32_t max) {
 double getUniformNumber(void) {
     return (double)u32_to_float32(philox_next_u64);
 }
+
+#ifdef PRNG_TEST
+uint32_t prng_test_next_u32(void) {
+    return philox_next_u32();
+}
+#endif
